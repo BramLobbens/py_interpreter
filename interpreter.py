@@ -1,7 +1,8 @@
 from collections import namedtuple
 
 Token = namedtuple('Token', 'type_ value')
-INTEGER, PLUS, EOF = 'INTEGER', 'PLUS', 'EOF'
+INTEGER, PLUS, EOF, WS = 'INTEGER', 'PLUS', 'EOF', 'WS'
+WHITESPACE = (" ", "\t")
 
 class Interpreter:
     def __init__(self, text):
@@ -28,16 +29,28 @@ class Interpreter:
 
         # get char at self.pos and decide what token to create
         current_char = text[self.pos]
+        number = ""
 
-        if current_char.isdigit():
-            token = Token(INTEGER, int(current_char))
+        # read multiple digits
+        while current_char.isdigit():
+            number += current_char
             self.pos += 1
+            if self.pos > len(text) - 1:
+                break
+            current_char = text[self.pos]
+          
+        if number:
+            token = Token(INTEGER, int(number))
             return token
 
         if current_char == '+':
             token = Token(PLUS, current_char)
             self.pos += 1
             return token
+
+        if current_char in WHITESPACE:
+            self.pos += 1
+            return Token(WS, None)
 
         self.error()
 
@@ -47,13 +60,23 @@ class Interpreter:
         # the next token to the self.current_token,
         # otherwise raise an exception.
         if self.current_token.type_ == token_type:
-            self.current_token = self.get_next_token()
+            # skip WHITESPACE chars
+            next_token = self.get_next_token()
+            while next_token.type_ == WS:
+                next_token = self.get_next_token()
+            self.current_token = next_token
         else:
             self.error()
 
     def expr(self):
         """expr -> <Int> + <Int>"""
-        self.current_token = self.get_next_token()
+
+        # skip WHITESPACE chars
+        next_token = self.get_next_token()
+        while next_token.type_ == WS:
+            next_token = self.get_next_token()
+
+        self.current_token = next_token
 
         # we expect current token to be a single-digit integer
         left = self.current_token
@@ -70,4 +93,4 @@ class Interpreter:
         # after the above call self.current_token is set to
         # EOF token
 
-        return left.value + right.value
+        return left.value op. right.value
