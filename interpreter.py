@@ -93,4 +93,4 @@ class Interpreter:
         # after the above call self.current_token is set to
         # EOF token
 
-        return left.value op. right.value
+        return left.value + right.value
