@@ -1,5 +1,6 @@
-from token import Token
+from collections import namedtuple
 
+Token = namedtuple('Token', 'type_ value')
 INTEGER, PLUS, EOF = 'INTEGER', 'PLUS', 'EOF'
 
 class Interpreter:
