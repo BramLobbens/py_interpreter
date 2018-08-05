@@ -1,58 +1,74 @@
 from collections import namedtuple
 
 Token = namedtuple('Token', 'type_ value')
-INTEGER, PLUS, EOF, WS = 'INTEGER', 'PLUS', 'EOF', 'WS'
-WHITESPACE = (" ", "\t")
+INTEGER, PLUS, MINUS, MULT, DIV, EOF = 'INTEGER', 'PLUS', 'MINUS', 'MULT', 'DIV', 'EOF'
 
 class Interpreter:
     def __init__(self, text):
-        # user string input, e.g. "3+5"
+        # user string input, e.g. "112 - 57"
         self.text = text
         # index of self.text
         self.pos = 0
         # current token instance
         self.current_token = None
+        self.current_char = self.text[self.pos]
 
     def error(self):
         raise Exception('Error parsing input')
+
+    def advance(self):
+        """Advance the 'pos' pointer and set the 'current_char' variable."""
+        self.pos += 1
+        if self.pos > len(self.text) - 1:
+            self.current_char = None # end of input
+        else:
+            self.current_char = self.text[self.pos]
+
+    def skip_whitespace(self):
+        while self.current_char is not None and self.current_char.isspace():
+            self.advance()
+
+    def integer(self):
+        """Return a (multidigit) integer consumed from the input."""
+        result = ''
+        while self.current_char is not None and self.current_char.isdigit():
+            result += self.current_char
+            self.advance()
+        return int(result)
 
     def get_next_token(self):
         """Lexical analyser (scanner, tokeniser)
         This method is responsible for breaking a sentence
         apart into tokens. One token at a time.
         """
-        text = self.text
+        while self.current_char is not None:
 
-        # if pos past last index -> EOF
-        if self.pos > len(text) - 1:
-            return Token(EOF, None)
+            if self.current_char.isspace():
+                self.skip_whitespace()
+                continue
 
-        # get char at self.pos and decide what token to create
-        current_char = text[self.pos]
-        number = ""
+            if self.current_char.isdigit():
+                return Token(INTEGER, self.integer())
 
-        # read multiple digits
-        while current_char.isdigit():
-            number += current_char
-            self.pos += 1
-            if self.pos > len(text) - 1:
-                break
-            current_char = text[self.pos]
-          
-        if number:
-            token = Token(INTEGER, int(number))
-            return token
+            if self.current_char == '+':
+                self.advance()
+                return Token(PLUS, '+')
 
-        if current_char == '+':
-            token = Token(PLUS, current_char)
-            self.pos += 1
-            return token
+            if self.current_char == '-':
+                self.advance()
+                return Token(MINUS, '-')
 
-        if current_char in WHITESPACE:
-            self.pos += 1
-            return Token(WS, None)
+            if self.current_char == '*':
+                self.advance()
+                return Token(MULT, '*')
 
-        self.error()
+            if self.current_char == '/':
+                self.advance()
+                return Token(DIV, '/')
+            
+            self.error()
+
+        return Token(EOF, None)
 
     def eat(self, token_type):
         # compare current token type with he passed token type,
@@ -60,37 +76,45 @@ class Interpreter:
         # the next token to the self.current_token,
         # otherwise raise an exception.
         if self.current_token.type_ == token_type:
-            # skip WHITESPACE chars
-            next_token = self.get_next_token()
-            while next_token.type_ == WS:
-                next_token = self.get_next_token()
-            self.current_token = next_token
+            self.current_token = self.get_next_token()
         else:
             self.error()
 
+    def term(self):
+        """return an INTEGER token value"""
+        token = self.current_token
+        self.eat(INTEGER)
+        return token.value
+
     def expr(self):
-        """expr -> <Int> + <Int>"""
+        """
+        Parser/Interpreter
 
-        # skip WHITESPACE chars
-        next_token = self.get_next_token()
-        while next_token.type_ == WS:
-            next_token = self.get_next_token()
+        expr -> <Int> <Operator> <Int>
+        """
 
-        self.current_token = next_token
+        # set current token to the first token taken from the input
+        self.current_token = self.get_next_token()
 
-        # we expect current token to be a single-digit integer
-        left = self.current_token
-        self.eat(INTEGER)
+        result = self.term()
+        while self.current_token.type_ in (PLUS, MINUS, MULT, DIV):
+            token = self.current_token
+            if token.type_ == PLUS:
+                self.eat(PLUS)
+                result = result + self.term()
+            if token.type_ == MINUS:
+                self.eat(MINUS)
+                result = result - self.term()
+            if token.type_ == MULT:
+                self.eat(MULT)
+                result = result * self.term()
+            elif token.type_ == DIV:
+                self.eat(DIV)
+                try:
+                    result = result / self.term()
+                except ZeroDivisionError:
+                    print('Error: trying to divide by zero.')
+                    return
 
-        # we expect current token t be a '+' token
-        op = self.current_token
-        self.eat(PLUS)
+        return result
 
-        # we expect current token to be a single-digit integer
-        right = self.current_token
-        self.eat(INTEGER)
-
-        # after the above call self.current_token is set to
-        # EOF token
-
-        return left.value + right.value
